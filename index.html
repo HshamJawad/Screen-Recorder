@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Screen Recorder</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 600px;
+            width: 100%;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-bottom: 30px;
+        }
+        
+        button {
+            padding: 15px 30px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        #startBtn {
+            background: #10b981;
+            color: white;
+        }
+        
+        #startBtn:hover:not(:disabled) {
+            background: #059669;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(16, 185, 129, 0.4);
+        }
+        
+        #stopBtn {
+            background: #ef4444;
+            color: white;
+        }
+        
+        #stopBtn:hover:not(:disabled) {
+            background: #dc2626;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(239, 68, 68, 0.4);
+        }
+        
+        button:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+        }
+        
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+        
+        .status.idle {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        
+        .status.recording {
+            background: #fee2e2;
+            color: #dc2626;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        
+        .status.ready {
+            background: #d1fae5;
+            color: #059669;
+        }
+        
+        .preview {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        video {
+            max-width: 100%;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            margin-bottom: 15px;
+        }
+        
+        #downloadBtn {
+            background: #3b82f6;
+            color: white;
+        }
+        
+        #downloadBtn:hover {
+            background: #2563eb;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(59, 130, 246, 0.4);
+        }
+        
+        .timer {
+            text-align: center;
+            font-size: 32px;
+            font-weight: bold;
+            color: #dc2626;
+            margin-bottom: 20px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .floating-controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            border-radius: 15px;
+            padding: 15px 20px;
+            display: none;
+            align-items: center;
+            gap: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            cursor: move;
+            z-index: 99999;
+            backdrop-filter: blur(10px);
+        }
+        
+        .floating-controls.active {
+            display: flex !important;
+        }
+        
+        .drag-handle {
+            color: #666;
+            font-size: 18px;
+            cursor: grab;
+            user-select: none;
+        }
+        
+        .drag-handle:active {
+            cursor: grabbing;
+        }
+        
+        .floating-timer {
+            color: #ef4444;
+            font-size: 20px;
+            font-weight: bold;
+            font-family: 'Courier New', monospace;
+            min-width: 90px;
+        }
+        
+        .floating-stop {
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .floating-stop:hover {
+            background: #dc2626;
+            transform: scale(1.05);
+        }
+    </style>
+</head>
+<body>
+    <div class="container" id="mainContainer">
+        <h1>🎥 Screen Recorder</h1>
+        <p class="subtitle">Record your screen and save as MP4</p>
+        
+        <div class="status idle" id="status">Ready to record</div>
+        
+        <div class="controls">
+            <button id="startBtn">Start Recording</button>
+            <button id="stopBtn" disabled>Stop Recording</button>
+        </div>
+        
+        <div class="preview" id="preview" style="display: none;">
+            <video id="recordedVideo" controls></video>
+            <br>
+            <button id="downloadBtn">Download MP4</button>
+        </div>
+    </div>
+    
+    <div class="floating-controls" id="floatingControls">
+        <div class="drag-handle">⋮⋮</div>
+        <div class="floating-timer" id="floatingTimer">00:00:00</div>
+        <button class="floating-stop" id="floatingStopBtn">⬛ Stop</button>
+    </div>
+
+<script>
+let mediaRecorder;
+let recordedChunks = [];
+let stream;
+let timerInterval;
+let startTime;
+let micStream;
+let combinedStream;
+let audioContext;
+let destination;
+        
+const startBtn = document.getElementById('startBtn');
+const stopBtn = document.getElementById('stopBtn');
+const status = document.getElementById('status');
+const preview = document.getElementById('preview');
+const recordedVideo = document.getElementById('recordedVideo');
+const downloadBtn = document.getElementById('downloadBtn');
+const mainContainer = document.getElementById('mainContainer');
+const floatingControls = document.getElementById('floatingControls');
+const floatingTimer = document.getElementById('floatingTimer');
+const floatingStopBtn = document.getElementById('floatingStopBtn');
+
+startBtn.addEventListener('click', startRecording);
+stopBtn.addEventListener('click', stopRecording);
+floatingStopBtn.addEventListener('click', stopRecording);
+downloadBtn.addEventListener('click', downloadVideo);
+
+let isDragging = false;
+let offsetX;
+let offsetY;
+
+floatingControls.addEventListener('mousedown', dragStart);
+document.addEventListener('mousemove', drag);
+document.addEventListener('mouseup', dragEnd);
+
+function dragStart(e) {
+    if (e.target.classList.contains('floating-stop')) return;
+    
+    isDragging = true;
+    const rect = floatingControls.getBoundingClientRect();
+    offsetX = e.clientX - rect.left;
+    offsetY = e.clientY - rect.top;
+    floatingControls.style.cursor = 'grabbing';
+}
+
+function drag(e) {
+    if (isDragging) {
+        e.preventDefault();
+        
+        let newX = e.clientX - offsetX;
+        let newY = e.clientY - offsetY;
+        
+        newX = Math.max(0, Math.min(newX, window.innerWidth - floatingControls.offsetWidth));
+        newY = Math.max(0, Math.min(newY, window.innerHeight - floatingControls.offsetHeight));
+        
+        floatingControls.style.left = newX + 'px';
+        floatingControls.style.top = newY + 'px';
+        floatingControls.style.right = 'auto';
+        floatingControls.style.bottom = 'auto';
+    }
+}
+
+function dragEnd() {
+    isDragging = false;
+    floatingControls.style.cursor = 'move';
+}
+
+async function startRecording() {
+    try {
+        stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: false
+        });
+
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true
+            }
+        });
+
+        audioContext = new AudioContext();
+        await audioContext.resume();
+        const micSource = audioContext.createMediaStreamSource(micStream);
+        destination = audioContext.createMediaStreamDestination();
+        micSource.connect(destination);
+
+        combinedStream = new MediaStream([
+            ...stream.getVideoTracks(),
+            ...destination.stream.getAudioTracks()
+        ]);
+
+        recordedChunks = [];
+
+        let options = {};
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')) {
+            options.mimeType = 'video/webm;codecs=vp8,opus';
+        } else if (MediaRecorder.isTypeSupported('video/webm')) {
+            options.mimeType = 'video/webm';
+        }
+
+        mediaRecorder = new MediaRecorder(combinedStream, options);
+
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = handleStop;
+        mediaRecorder.start();
+
+        mainContainer.style.display = 'none';
+        floatingControls.classList.add('active');
+
+        startTime = Date.now();
+        timerInterval = setInterval(updateTimer, 1000);
+        updateTimer();
+
+        stream.getVideoTracks()[0].addEventListener('ended', () => {
+            stopRecording();
+        });
+
+    } catch (err) {
+        console.error('Error starting recording:', err);
+        alert('Failed to start recording. Please allow Screen + Microphone permissions.');
+    }
+}
+
+function updateTimer() {
+    const elapsed = Math.floor((Date.now() - startTime) / 1000);
+    const hours = Math.floor(elapsed / 3600);
+    const minutes = Math.floor((elapsed % 3600) / 60);
+    const seconds = elapsed % 60;
+    
+    const timeString = 
+        String(hours).padStart(2, '0') + ':' +
+        String(minutes).padStart(2, '0') + ':' +
+        String(seconds).padStart(2, '0');
+    
+    floatingTimer.textContent = timeString;
+}
+
+function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+    }
+    
+    clearInterval(timerInterval);
+    
+    floatingControls.classList.remove('active');
+    mainContainer.style.display = 'block';
+}
+
+function handleStop() {
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    if (micStream) micStream.getTracks().forEach(track => track.stop());
+    if (audioContext) audioContext.close();
+
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `screen-recording-${Date.now()}.webm`;
+    a.click();
+}
+
+function downloadVideo() {
+    const blob = new Blob(recordedChunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    a.href = url;
+    a.download = `screen-recording-${Date.now()}.webm`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+</script>
+</body>
+</html>
